@@ -1,32 +1,24 @@
-# %%
 import csv
-from datetime import datetime
+from datetime import date, datetime, timedelta
+from typing import List
 
-from bs4 import BeautifulSoup, ResultSet, Tag
 import requests
+from bs4 import BeautifulSoup, ResultSet, Tag
 from requests.models import Response
-
-date: str = "20200619"
-
-url: str = f"https://b.hatena.ne.jp/hotentry/all/{date}"
-response: Response = requests.get(url)
-response.raise_for_status()
-bs: BeautifulSoup = BeautifulSoup(response.text, features="html.parser")
-entry_contents: ResultSet = bs.select(".entrylist-contents")
-# 17-
-
-
-# %%
 
 
 class Entry:
+    """ブックマークエントリー
+    """
+
     def __init__(self, contents: Tag) -> None:
+        link = contents.select_one("h3.entrylist-contents-title > a")
+
         # title
-        self.title: str = contents.select_one("h3.entrylist-contents-title > a")[
-            "title"
-        ]
+        self.title: str = link["title"]
         # link
-        self.link: str = contents.select_one("h3.entrylist-contents-title > a")["href"]
+        self.link: str = link["href"]
+
         # bookmarked users
         self.users: int = int(
             contents.select_one(".entrylist-contents-users span").text
@@ -57,51 +49,43 @@ class Entry:
         return f"{self.title}, {self.link}"
 
 
-# %%
+def write_to_csv(_date: str, entry_contents: List[Entry]):
+    fieldnames = [
+        "title",
+        "link",
+        "users",
+        "domain",
+        "description",
+        "category",
+        "date",
+        "tags",
+    ]
 
-# ec = entry_contents[0]
-# # title
-# ec.select_one("h3.entrylist-contents-title > a")["title"]
-# # link
-# ec.select_one("h3.entrylist-contents-title > a")["href"]
-# # bookmarked users
-# ec.select_one(".entrylist-contents-users span").text
-# # domain
-# ec.select_one(".entrylist-contents-domain > a > span").text
-# # description
-# ec.select_one("p.entrylist-contents-description").text
-# # category
-# ec.select_one("li.entrylist-contents-category > a").text
-# # date
-# ec.select_one("li.entrylist-contents-date").text
-# # tags
-# [e.text for e in ec.select("ul.entrylist-contents-tags a")]
+    with open(f"{_date}.csv", "w") as f:
+        writer = csv.DictWriter(f, fieldnames)
 
-# %%
-
-# entries = []
-# for entry_content in entry_contents:
-#     entry = Entry(entry_content)
-
-#     entries.append(entry)
+        for entry_content in entry_contents:
+            writer.writerow(Entry(entry_content).__dict__)
 
 
-# %%
-fieldnames = [
-    "title",
-    "link",
-    "users",
-    "domain",
-    "description",
-    "category",
-    "date",
-    "tags",
-]
+def fetch_data(_date: str) -> ResultSet:
+    url: str = f"https://b.hatena.ne.jp/hotentry/all/{_date}"
+    response: Response = requests.get(url)
+    response.raise_for_status()
+    bs: BeautifulSoup = BeautifulSoup(response.text, features="html.parser")
+    entry_contents: ResultSet = bs.select(".entrylist-contents")
 
-with open(f"{date}.csv", "w") as f:
-    writer = csv.DictWriter(f, fieldnames)
+    return entry_contents
 
-    for entry_content in entry_contents:
-        writer.writerow(Entry(entry_content).__dict__)
 
-# %%
+def main():
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+
+    _date: str = (yesterday).strftime("%Y%m%d")
+    entry_contents = fetch_data(_date)
+    write_to_csv(_date, entry_contents)
+
+
+if __name__ == "__main__":
+    main()
