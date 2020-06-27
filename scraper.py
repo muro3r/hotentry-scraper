@@ -1,9 +1,12 @@
 import csv
 from datetime import date, datetime, timedelta
+import logging
+from os.path import exists
+import time
 from typing import List
 
-import requests
 from bs4 import BeautifulSoup, ResultSet, Tag
+import requests
 from requests.models import Response
 
 
@@ -61,7 +64,7 @@ def write_to_csv(_date: str, entry_contents: List[Entry]):
         "tags",
     ]
 
-    with open(f"{_date}.csv", "w") as f:
+    with open(f"out/{_date}.csv", "w") as f:
         writer = csv.DictWriter(f, fieldnames)
 
         for entry_content in entry_contents:
@@ -80,12 +83,23 @@ def fetch_data(_date: str) -> ResultSet:
 
 def main():
     today = date.today()
-    yesterday = today - timedelta(days=1)
 
-    _date: str = (yesterday).strftime("%Y%m%d")
-    entry_contents = fetch_data(_date)
-    write_to_csv(_date, entry_contents)
+    for i in range(1, 30 * 6 + 1):
+        day: date = today - timedelta(days=i)
+        _date: str = day.strftime("%Y%m%d")
+
+        if exists(f"out/{_date}.csv"):
+            logging.info(f"Entry data exists: {_date}, Skip.")
+            continue
+
+        logging.info(f"Download entry data: {_date}")
+        entry_contents = fetch_data(_date)
+        write_to_csv(_date, entry_contents)
+
+        time.sleep(0.5)
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+
     main()
